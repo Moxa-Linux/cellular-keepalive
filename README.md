@@ -7,7 +7,7 @@ This example script/systemd.service are written for keep cellular connections al
 ## Install
 1. Copy files
     - `cellular-keepalive` to `/usr/sbin/cellular-keepalive`
-    - `cellular-keepalive` to `/etc/systemd/system/cellular-keepalive.service`
+    - `cellular-keepalive.service` to `/etc/systemd/system/cellular-keepalive.service`
 2. Set executable permission `chmod +x /usr/sbin/cellular-keepalive`
 3. Enable systemd service, `systemctl enable cellular-keepalive`
 4. Start systemd service, `systemctl start cellular-keepalive`
