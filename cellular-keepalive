@@ -1,8 +1,10 @@
 #!/bin/bash
 
+
 PING_TARGET="8.8.8.8"
 PING_COUNT="3"
 LOG_FILE="/dev/shm/record"
+#LOG_FILE=/dev/console
 QMI_NODE="/dev/cdc-wdm0"
 #QMI_IF="wwan0"
 #PIN_CODE="0000"
@@ -19,16 +21,43 @@ keep_alive () {
 		sleep 10
 		# ifconfig ${QMI_IF} mtu 1500
 		date=$(date +"%Y/%m/%d %H:%M:%S")
-		echo "$date Cannot ping $PING_TARGET, restart the connection..." > $LOG_FILE
+		echo "$date Cannot ping $PING_TARGET, restart the connection..." >> $LOG_FILE
 		ping $PING_TARGET -c $PING_COUNT
 	done
 }
 
 err_chk () {
+	local count=$1
+	local ret
+
+        if [ x"$(($count%20))" == x"0" ]; then
+		if [ x"$(($count%80))" == x"0" ]; then 
+			cell_mgmt power_cycle
+			echo "$date Cannot get signal, reset module..." >> $LOG_FILE
+			sleep 30
+			return
+		fi
+
+		cell_mgmt sw_reset
+		ret=$?
+	
+		if [ "${ret}" == "3" ]; then #sw_reset no support
+			cell_mgmt power_cycle
+			echo "$date Cannot get signal, HW reset module..." >> $LOG_FILE
+			sleep 30
+			return
+		else
+			echo "$date Cannot get signal, SW reset module..." >> $LOG_FILE
+			sleep 30
+			return
+		fi
+        fi
+
 	if [ "$1" -gt 3 ]; then
-		cell_mgmt power_cycle
-		echo "$date Cannot get signal, reset module..." > $LOG_FILE
-		sleep 30
+		cell_mgmt set_flight_mode 1
+                sleep 5
+                cell_mgmt set_flight_mode 0
+		echo "$date Cannot get signal, Entering and exiting flight mode forces the modem to rescan for new base station...." >> $LOG_FILE
 	fi
 }
 
@@ -45,7 +74,7 @@ log_data () {
 			cell_mgmt restart
 			# ifconfig ${QMI_IF} mtu 1500
 			date=$(date +"%Y/%m/%d %H:%M:%S")
-			echo "$date Cannot reach AP anymore, restart the connection..." > $LOG_FILE
+			echo "$date Cannot reach AP anymore, restart the connection..." >> $LOG_FILE
 		fi
 		status=$(cell_mgmt status | head -n 1 | awk '{print $2}')
 		sleep 0.5
@@ -57,13 +86,13 @@ log_data () {
 		if [ x"$dbm" == x"dbm " ]; then
 			qmicli -p -d ${QMI_NODE} --nas-reset
 			date=$(date +"%Y/%m/%d %H:%M:%S")
-			echo "$date Cannot fetch signal, reset NAS function of module..." > $LOG_FILE
+			echo "$date Cannot fetch signal, reset NAS function of module..." >> $LOG_FILE
 		fi
 		dbm=$(cell_mgmt signal | awk '{print $1 " " $2}')
 		sleep 0.5
     done
     date=$(date +"%Y/%m/%d %H:%M:%S")
-    echo "$date $dbm $status" > $LOG_FILE
+    echo "$date $dbm $status" >> $LOG_FILE
 }
 
 #enter pin code to unlock sim card
